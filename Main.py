@@ -1,23 +1,9 @@
-
-# ============================================
-# CS2AI Fuel Price Forecasting Coursework
-# FINAL VERSION
-# ============================================
-
-# Install required libraries first:
-# pip install pandas matplotlib seaborn scikit-learn
-
-# ============================================
-# IMPORT LIBRARIES
-# ============================================
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-
 from sklearn.preprocessing import StandardScaler
 
 from sklearn.metrics import (
@@ -26,21 +12,15 @@ from sklearn.metrics import (
     r2_score
 )
 
-# ============================================
-# LOAD DATASET
-# ============================================
+# Load dataset
 
 df = pd.read_csv("fuel_prices.csv")
 
-# ============================================
-# KEEP ONLY FIRST 5 COLUMNS
-# ============================================
+# Keep only first 5 columns
 
 df = df.iloc[:, :5]
 
-# ============================================
-# RENAME COLUMNS
-# ============================================
+# Rename columns
 
 df.columns = [
     "Year",
@@ -50,16 +30,11 @@ df.columns = [
     "CrudeOilIndex"
 ]
 
-# ============================================
-# REMOVE REPEATED HEADER ROWS
-# ============================================
+# Remove repeated header rows
 
 df = df[df["Year"] != "Year"]
 
-# ============================================
-# CLEAN CRUDE OIL COLUMN
-# Removes values like "98.10r"
-# ============================================
+# Clean crude oil column
 
 df["CrudeOilIndex"] = (
     df["CrudeOilIndex"]
@@ -67,9 +42,7 @@ df["CrudeOilIndex"] = (
     .str.replace("r", "", regex=False)
 )
 
-# ============================================
-# CONVERT TO NUMERIC
-# ============================================
+# Convert columns to numeric
 
 df["Year"] = pd.to_numeric(
     df["Year"],
@@ -91,70 +64,43 @@ df["CrudeOilIndex"] = pd.to_numeric(
     errors="coerce"
 )
 
-# ============================================
-# DROP MISSING VALUES
-# ============================================
+# Drop missing values
 
 df = df.dropna()
 
-# ============================================
-# CONVERT YEAR TO INTEGER
-# ============================================
+# Convert year to integer
 
 df["Year"] = df["Year"].astype(int)
 
-# ============================================
-# CREATE DATE COLUMN
-# ============================================
+# Create date column
 
 df["Date"] = pd.to_datetime(
     df["Year"].astype(str) + "-" + df["Month"].astype(str),
     format="%Y-%B"
 )
 
-# ============================================
-# FEATURE ENGINEERING
-# AUTOREGRESSIVE FEATURE
-# ============================================
+# Create autoregressive feature
 
 df["DieselPrevMonth"] = df["DieselPrice"].shift(1)
 
 # Remove missing row from shift()
+
 df = df.dropna()
 
-# ============================================
-# DISPLAY CLEANED DATASET
-# ============================================
+# Display cleaned dataset
 
-print("\n================================")
-print("CLEANED DATASET")
-print("================================")
-
+print("\nCLEANED DATASET")
 print(df.head())
 
-print("\n================================")
-print("DATA TYPES")
-print("================================")
-
+print("\nDATA TYPES")
 print(df.dtypes)
 
-# ============================================
-# BASIC STATISTICS
-# ============================================
+# Display summary statistics
 
-print("\n================================")
-print("SUMMARY STATISTICS")
-print("================================")
-
+print("\nSUMMARY STATISTICS")
 print(df.describe())
 
-# ============================================
-# EXPLORATORY DATA ANALYSIS
-# ============================================
-
-# --------------------------------------------
-# DIESEL PRICE OVER TIME
-# --------------------------------------------
+# Diesel price graph
 
 plt.figure(figsize=(12,6))
 
@@ -173,9 +119,7 @@ plt.savefig("diesel_prices.png")
 
 plt.close()
 
-# --------------------------------------------
-# PETROL PRICE OVER TIME
-# --------------------------------------------
+# Petrol price graph
 
 plt.figure(figsize=(12,6))
 
@@ -194,9 +138,7 @@ plt.savefig("petrol_prices.png")
 
 plt.close()
 
-# --------------------------------------------
-# CRUDE OIL INDEX OVER TIME
-# --------------------------------------------
+# Crude oil index graph
 
 plt.figure(figsize=(12,6))
 
@@ -215,9 +157,7 @@ plt.savefig("crude_oil_index.png")
 
 plt.close()
 
-# --------------------------------------------
-# CORRELATION HEATMAP
-# --------------------------------------------
+# Correlation heatmap
 
 plt.figure(figsize=(8,6))
 
@@ -239,17 +179,12 @@ plt.savefig("correlation_heatmap.png")
 
 plt.close()
 
-# ============================================
-# TRAIN / TEST SPLIT
-# TIME SERIES SPLIT
-# ============================================
+# Train test split
 
 train = df[df["Year"] < 2023]
 test = df[df["Year"] >= 2023]
 
-# ============================================
-# FEATURES AND TARGET
-# ============================================
+# Features and target
 
 X_train = train[[
     "PetrolPrice",
@@ -267,9 +202,7 @@ X_test = test[[
 
 y_test = test["DieselPrice"]
 
-# ============================================
-# FEATURE SCALING
-# ============================================
+# Feature scaling
 
 scaler = StandardScaler()
 
@@ -277,9 +210,7 @@ X_train_scaled = scaler.fit_transform(X_train)
 
 X_test_scaled = scaler.transform(X_test)
 
-# ============================================
-# MODEL 1 - LINEAR REGRESSION
-# ============================================
+# Linear Regression model
 
 linear_model = LinearRegression()
 
@@ -292,9 +223,7 @@ linear_predictions = linear_model.predict(
     X_test_scaled
 )
 
-# ============================================
-# MODEL 2 - RANDOM FOREST REGRESSOR
-# ============================================
+# Random Forest model
 
 random_forest_model = RandomForestRegressor(
     n_estimators=100,
@@ -310,9 +239,7 @@ random_forest_predictions = random_forest_model.predict(
     X_test
 )
 
-# ============================================
-# EVALUATION FUNCTION
-# ============================================
+# Evaluation function
 
 def evaluate_model(y_true, predictions, model_name):
 
@@ -331,17 +258,13 @@ def evaluate_model(y_true, predictions, model_name):
         predictions
     )
 
-    print("\n================================")
-    print(model_name)
-    print("================================")
+    print(f"\n{model_name}")
 
     print(f"MAE:  {mae:.2f}")
     print(f"RMSE: {rmse:.2f}")
     print(f"R²:   {r2:.4f}")
 
-# ============================================
-# EVALUATE MODELS
-# ============================================
+# Evaluate models
 
 evaluate_model(
     y_test,
@@ -355,9 +278,7 @@ evaluate_model(
     "Random Forest Regressor"
 )
 
-# ============================================
-# ACTUAL VS PREDICTED GRAPH
-# ============================================
+# Actual vs predicted graph
 
 plt.figure(figsize=(14,7))
 
@@ -392,9 +313,7 @@ plt.savefig("predicted_vs_actual.png")
 
 plt.close()
 
-# ============================================
-# RESIDUAL PLOT
-# ============================================
+# Residual plot
 
 residuals = y_test - linear_predictions
 
@@ -422,9 +341,7 @@ plt.savefig("residual_plot.png")
 
 plt.close()
 
-# ============================================
-# RANDOM FOREST FEATURE IMPORTANCE
-# ============================================
+# Random Forest feature importance
 
 importance = pd.DataFrame({
 
@@ -440,15 +357,10 @@ importance = importance.sort_values(
     ascending=False
 )
 
-print("\n================================")
-print("FEATURE IMPORTANCE")
-print("================================")
-
+print("\nFEATURE IMPORTANCE")
 print(importance)
 
-# ============================================
-# FEATURE IMPORTANCE GRAPH
-# ============================================
+# Feature importance graph
 
 plt.figure(figsize=(8,6))
 
@@ -467,22 +379,16 @@ plt.savefig("feature_importance.png")
 
 plt.close()
 
-# ============================================
-# SAVE CLEANED DATASET
-# ============================================
+# Save cleaned dataset
 
 df.to_csv(
     "cleaned_fuel_prices.csv",
     index=False
 )
 
-# ============================================
-# FINAL OUTPUT MESSAGE
-# ============================================
+# Final output message
 
-print("\n================================")
-print("PROJECT COMPLETED SUCCESSFULLY")
-print("================================")
+print("\nPROJECT COMPLETED SUCCESSFULLY")
 
 print("\nSaved Files:")
 
@@ -494,7 +400,3 @@ print("- correlation_heatmap.png")
 print("- predicted_vs_actual.png")
 print("- residual_plot.png")
 print("- feature_importance.png")
-
-# ============================================
-# END OF PROJECT
-# ============================================
