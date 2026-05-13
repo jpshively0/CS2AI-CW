@@ -1,16 +1,86 @@
+# Import libraries
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeRegressor
+
+from sklearn.preprocessing import (
+    StandardScaler,
+    MinMaxScaler
+)
 
 from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
     r2_score
 )
+
+# SNR
+
+def SNR(df, column_name):
+
+    signal = df[column_name].mean()
+
+    noise = df[column_name].std()
+
+    ratio = signal / noise
+
+    return ratio
+
+# Imputation
+
+def Imp(df, column_name):
+
+    return df[column_name].fillna(
+        method='ffill',
+        inplace=True
+    )
+
+# Alternative imputation
+
+def ImpAlt(df, column_name):
+
+    df[column_name] = (
+        df[column_name]
+        .interpolate()
+    )
+
+    return df[column_name]
+
+# Normalisation
+
+def MidMaxNormal(df, column_names):
+
+    scaler = MinMaxScaler()
+
+    df_normal = df.copy()
+
+    df_normal[column_names] = (
+        scaler.fit_transform(
+            df_normal[column_names]
+        )
+    )
+
+    return df_normal
+
+# Table transformation
+
+def Transform(df, column_name, target):
+
+    df[column_name] = (
+        df[column_name]
+        .astype(int)
+    )
+
+    column_avg = (
+        df.groupby(column_name)[[target]]
+        .mean()
+    )
+
+    return column_avg
 
 # Load dataset
 
@@ -64,6 +134,10 @@ df["CrudeOilIndex"] = pd.to_numeric(
     errors="coerce"
 )
 
+# Imputation
+
+ImpAlt(df, "CrudeOilIndex")
+
 # Drop missing values
 
 df = df.dropna()
@@ -83,9 +157,49 @@ df["Date"] = pd.to_datetime(
 
 df["DieselPrevMonth"] = df["DieselPrice"].shift(1)
 
-# Remove missing row from shift()
+# Create rolling mean feature
+
+df["DieselRollingMean3"] = (
+    df["DieselPrice"]
+    .rolling(window=3)
+    .mean()
+)
+
+# Remove missing rows created by lagging
 
 df = df.dropna()
+
+# Signal-to-noise ratio
+
+snr_value = SNR(
+    df,
+    "DieselPrice"
+)
+
+print("\nSIGNAL TO NOISE RATIO")
+print(snr_value)
+
+# Min-Max normalization
+
+df = MidMaxNormal(
+    df,
+    [
+        "PetrolPrice",
+        "DieselPrice",
+        "CrudeOilIndex"
+    ]
+)
+
+# Table transformation
+
+year_average = Transform(
+    df,
+    "Year",
+    "DieselPrice"
+)
+
+print("\nYEARLY DIESEL PRICE AVERAGE")
+print(year_average.head())
 
 # Display cleaned dataset
 
@@ -166,7 +280,8 @@ sns.heatmap(
         "PetrolPrice",
         "DieselPrice",
         "CrudeOilIndex",
-        "DieselPrevMonth"
+        "DieselPrevMonth",
+        "DieselRollingMean3"
     ]].corr(),
     annot=True
 )
@@ -184,59 +299,57 @@ plt.close()
 train = df[df["Year"] < 2023]
 test = df[df["Year"] >= 2023]
 
-# Features and target
+# Original dataset features
 
-X_train = train[[
+X_train_original = train[[
+    "PetrolPrice",
+    "CrudeOilIndex"
+]]
+
+X_test_original = test[[
+    "PetrolPrice",
+    "CrudeOilIndex"
+]]
+
+# Modified dataset features
+
+X_train_modified = train[[
     "PetrolPrice",
     "CrudeOilIndex",
-    "DieselPrevMonth"
+    "DieselPrevMonth",
+    "DieselRollingMean3"
 ]]
+
+X_test_modified = test[[
+    "PetrolPrice",
+    "CrudeOilIndex",
+    "DieselPrevMonth",
+    "DieselRollingMean3"
+]]
+
+# Target variable
 
 y_train = train["DieselPrice"]
-
-X_test = test[[
-    "PetrolPrice",
-    "CrudeOilIndex",
-    "DieselPrevMonth"
-]]
-
 y_test = test["DieselPrice"]
 
 # Feature scaling
 
 scaler = StandardScaler()
 
-X_train_scaled = scaler.fit_transform(X_train)
-
-X_test_scaled = scaler.transform(X_test)
-
-# Linear Regression model
-
-linear_model = LinearRegression()
-
-linear_model.fit(
-    X_train_scaled,
-    y_train
+X_train_original_scaled = scaler.fit_transform(
+    X_train_original
 )
 
-linear_predictions = linear_model.predict(
-    X_test_scaled
+X_test_original_scaled = scaler.transform(
+    X_test_original
 )
 
-# Random Forest model
-
-random_forest_model = RandomForestRegressor(
-    n_estimators=100,
-    random_state=42
+X_train_modified_scaled = scaler.fit_transform(
+    X_train_modified
 )
 
-random_forest_model.fit(
-    X_train,
-    y_train
-)
-
-random_forest_predictions = random_forest_model.predict(
-    X_test
+X_test_modified_scaled = scaler.transform(
+    X_test_modified
 )
 
 # Evaluation function
@@ -264,18 +377,90 @@ def evaluate_model(y_true, predictions, model_name):
     print(f"RMSE: {rmse:.2f}")
     print(f"R²:   {r2:.4f}")
 
-# Evaluate models
+# Linear Regression - Original Data
 
-evaluate_model(
-    y_test,
-    linear_predictions,
-    "Linear Regression"
+linear_original = LinearRegression()
+
+linear_original.fit(
+    X_train_original_scaled,
+    y_train
+)
+
+linear_original_predictions = linear_original.predict(
+    X_test_original_scaled
 )
 
 evaluate_model(
     y_test,
-    random_forest_predictions,
-    "Random Forest Regressor"
+    linear_original_predictions,
+    "Linear Regression - Original Data"
+)
+
+# Linear Regression - Modified Data
+
+linear_modified = LinearRegression()
+
+linear_modified.fit(
+    X_train_modified_scaled,
+    y_train
+)
+
+linear_modified_predictions = linear_modified.predict(
+    X_test_modified_scaled
+)
+
+evaluate_model(
+    y_test,
+    linear_modified_predictions,
+    "Linear Regression - Modified Data"
+)
+
+# Decision Tree - Original Data
+
+decision_tree_original = DecisionTreeRegressor(
+    max_depth=5,
+    random_state=42
+)
+
+decision_tree_original.fit(
+    X_train_original,
+    y_train
+)
+
+decision_tree_original_predictions = (
+    decision_tree_original.predict(
+        X_test_original
+    )
+)
+
+evaluate_model(
+    y_test,
+    decision_tree_original_predictions,
+    "Decision Tree - Original Data"
+)
+
+# Decision Tree - Modified Data
+
+decision_tree_modified = DecisionTreeRegressor(
+    max_depth=5,
+    random_state=42
+)
+
+decision_tree_modified.fit(
+    X_train_modified,
+    y_train
+)
+
+decision_tree_modified_predictions = (
+    decision_tree_modified.predict(
+        X_test_modified
+    )
+)
+
+evaluate_model(
+    y_test,
+    decision_tree_modified_predictions,
+    "Decision Tree - Modified Data"
 )
 
 # Actual vs predicted graph
@@ -290,14 +475,14 @@ plt.plot(
 
 plt.plot(
     test["Date"],
-    linear_predictions,
+    linear_modified_predictions,
     label="Linear Regression Predictions"
 )
 
 plt.plot(
     test["Date"],
-    random_forest_predictions,
-    label="Random Forest Predictions"
+    decision_tree_modified_predictions,
+    label="Decision Tree Predictions"
 )
 
 plt.title("Actual vs Predicted Diesel Prices")
@@ -315,12 +500,12 @@ plt.close()
 
 # Residual plot
 
-residuals = y_test - linear_predictions
+residuals = y_test - linear_modified_predictions
 
 plt.figure(figsize=(10,6))
 
 plt.scatter(
-    linear_predictions,
+    linear_modified_predictions,
     residuals
 )
 
@@ -341,14 +526,14 @@ plt.savefig("residual_plot.png")
 
 plt.close()
 
-# Random Forest feature importance
+# Decision Tree feature importance
 
 importance = pd.DataFrame({
 
-    "Feature": X_train.columns,
+    "Feature": X_train_modified.columns,
 
     "Importance":
-    random_forest_model.feature_importances_
+    decision_tree_modified.feature_importances_
 
 })
 
@@ -369,7 +554,7 @@ plt.bar(
     importance["Importance"]
 )
 
-plt.title("Random Forest Feature Importance")
+plt.title("Decision Tree Feature Importance")
 
 plt.ylabel("Importance")
 
@@ -400,3 +585,189 @@ print("- correlation_heatmap.png")
 print("- predicted_vs_actual.png")
 print("- residual_plot.png")
 print("- feature_importance.png")
+
+# Main menu system
+
+def main():
+
+    while True:
+
+        print("\n================================")
+        print("CS2AI FUEL PRICE FORECASTING")
+        print("================================")
+
+        print("1 - Display Dataset")
+        print("2 - Summary Statistics")
+        print("3 - Signal-to-Noise Ratio")
+        print("4 - Imputation")
+        print("5 - Normalisation")
+        print("6 - Table Transformation")
+        print("7 - Evaluate Linear Regression")
+        print("8 - Evaluate Decision Tree")
+        print("9 - Show Diesel Price Graph")
+        print("10 - Show Correlation Heatmap")
+        print("0 - Exit")
+
+        choice = input("\nSelect an option: ")
+
+        # Display dataset
+
+        if choice == "1":
+
+            print("\nDATASET")
+            print(df.head())
+
+        # Summary statistics
+
+        elif choice == "2":
+
+            print("\nSUMMARY STATISTICS")
+            print(df.describe())
+
+        # Signal to noise ratio
+
+        elif choice == "3":
+
+            snr_value = SNR(
+                df,
+                "DieselPrice"
+            )
+
+            print("\nSIGNAL TO NOISE RATIO")
+            print(snr_value)
+
+        # Imputation
+
+        elif choice == "4":
+
+            ImpAlt(
+                df,
+                "CrudeOilIndex"
+            )
+
+            print("\nIMPUTATION COMPLETE")
+
+            print(
+                df["CrudeOilIndex"]
+                .isnull()
+                .sum()
+            )
+
+        # Normalisation
+
+        elif choice == "5":
+
+            df_normal = MidMaxNormal(
+                df,
+                [
+                    "PetrolPrice",
+                    "DieselPrice",
+                    "CrudeOilIndex"
+                ]
+            )
+
+            print("\nNORMALISED DATA")
+
+            print(
+                df_normal[[
+                    "PetrolPrice",
+                    "DieselPrice",
+                    "CrudeOilIndex"
+                ]].head()
+            )
+
+        # Table transformation
+
+        elif choice == "6":
+
+            year_average = Transform(
+                df,
+                "Year",
+                "DieselPrice"
+            )
+
+            print("\nYEARLY DIESEL PRICE AVERAGE")
+
+            print(year_average.head())
+
+        # Linear Regression results
+
+        elif choice == "7":
+
+            evaluate_model(
+                y_test,
+                linear_modified_predictions,
+                "Linear Regression - Modified Data"
+            )
+
+        # Decision Tree results
+
+        elif choice == "8":
+
+            evaluate_model(
+                y_test,
+                decision_tree_modified_predictions,
+                "Decision Tree - Modified Data"
+            )
+
+        # Diesel price graph
+
+        elif choice == "9":
+
+            plt.figure(figsize=(12,6))
+
+            plt.plot(
+                df["Date"],
+                df["DieselPrice"]
+            )
+
+            plt.title(
+                "UK Diesel Prices Over Time"
+            )
+
+            plt.xlabel("Date")
+
+            plt.ylabel(
+                "Diesel Price (Pence per litre)"
+            )
+
+            plt.show()
+
+        # Correlation heatmap
+
+        elif choice == "10":
+
+            plt.figure(figsize=(8,6))
+
+            sns.heatmap(
+                df[[
+                    "PetrolPrice",
+                    "DieselPrice",
+                    "CrudeOilIndex",
+                    "DieselPrevMonth",
+                    "DieselRollingMean3"
+                ]].corr(),
+                annot=True
+            )
+
+            plt.title("Correlation Heatmap")
+
+            plt.show()
+
+        # Exit program
+
+        elif choice == "0":
+
+            print("\nPROGRAM CLOSED")
+            break
+
+        # Invalid input
+
+        else:
+
+            print("\nINVALID OPTION")
+
+# Run program
+
+main()
+
