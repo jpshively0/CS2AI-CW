@@ -1,3 +1,4 @@
+
 # Import libraries
 
 import pandas as pd
@@ -11,6 +12,8 @@ from sklearn.preprocessing import (
     StandardScaler,
     MinMaxScaler
 )
+
+from sklearn.model_selection import cross_val_score
 
 from sklearn.metrics import (
     mean_absolute_error,
@@ -213,6 +216,117 @@ print(df.dtypes)
 
 print("\nSUMMARY STATISTICS")
 print(df.describe())
+
+# Mean median and mode
+
+mean_price = df["DieselPrice"].mean()
+
+median_price = df["DieselPrice"].median()
+
+mode_price = df["DieselPrice"].mode()[0]
+
+print("\nMEAN DIESEL PRICE")
+print(mean_price)
+
+print("\nMEDIAN DIESEL PRICE")
+print(median_price)
+
+print("\nMODE DIESEL PRICE")
+print(mode_price)
+
+# Diesel graph with mean median mode
+
+plt.figure(figsize=(12,6))
+
+plt.plot(
+    df["Date"],
+    df["DieselPrice"],
+    label="Diesel Price"
+)
+
+plt.axhline(
+    mean_price,
+    linestyle="--",
+    label="Mean"
+)
+
+plt.axhline(
+    median_price,
+    linestyle=":",
+    label="Median"
+)
+
+plt.axhline(
+    mode_price,
+    linestyle="-.",
+    label="Mode"
+)
+
+plt.title("Diesel Prices with Mean Median Mode")
+
+plt.xlabel("Date")
+
+plt.ylabel("Diesel Price")
+
+plt.legend()
+
+plt.tight_layout()
+
+plt.savefig("diesel_mean_median_mode.png")
+
+plt.close()
+
+# Shewhart control chart
+
+upper_limit = (
+    mean_price +
+    (3 * df["DieselPrice"].std())
+)
+
+lower_limit = (
+    mean_price -
+    (3 * df["DieselPrice"].std())
+)
+
+plt.figure(figsize=(12,6))
+
+plt.plot(
+    df["Date"],
+    df["DieselPrice"],
+    label="Diesel Price"
+)
+
+plt.axhline(
+    upper_limit,
+    linestyle="--",
+    label="Upper Limit"
+)
+
+plt.axhline(
+    lower_limit,
+    linestyle="--",
+    label="Lower Limit"
+)
+
+plt.axhline(
+    mean_price,
+    linestyle="-.",
+    label="Mean"
+)
+
+plt.title("Shewhart Control Chart")
+
+plt.xlabel("Date")
+
+plt.ylabel("Diesel Price")
+
+plt.legend()
+
+plt.tight_layout()
+
+plt.savefig("shewhart_chart.png")
+
+plt.close()
 
 # Diesel price graph
 
@@ -463,6 +577,21 @@ evaluate_model(
     "Decision Tree - Modified Data"
 )
 
+# Cross validation
+
+cross_scores = cross_val_score(
+    linear_modified,
+    X_train_modified_scaled,
+    y_train,
+    cv=5
+)
+
+print("\nCROSS VALIDATION SCORES")
+print(cross_scores)
+
+print("\nAVERAGE CROSS VALIDATION SCORE")
+print(cross_scores.mean())
+
 # Actual vs predicted graph
 
 plt.figure(figsize=(14,7))
@@ -564,6 +693,105 @@ plt.savefig("feature_importance.png")
 
 plt.close()
 
+# Results table
+
+results = pd.DataFrame({
+
+    "Model": [
+
+        "Linear Regression Original",
+        "Linear Regression Modified",
+        "Decision Tree Original",
+        "Decision Tree Modified"
+
+    ],
+
+    "MAE": [
+
+        mean_absolute_error(
+            y_test,
+            linear_original_predictions
+        ),
+
+        mean_absolute_error(
+            y_test,
+            linear_modified_predictions
+        ),
+
+        mean_absolute_error(
+            y_test,
+            decision_tree_original_predictions
+        ),
+
+        mean_absolute_error(
+            y_test,
+            decision_tree_modified_predictions
+        )
+
+    ],
+
+    "RMSE": [
+
+        mean_squared_error(
+            y_test,
+            linear_original_predictions
+        ) ** 0.5,
+
+        mean_squared_error(
+            y_test,
+            linear_modified_predictions
+        ) ** 0.5,
+
+        mean_squared_error(
+            y_test,
+            decision_tree_original_predictions
+        ) ** 0.5,
+
+        mean_squared_error(
+            y_test,
+            decision_tree_modified_predictions
+        ) ** 0.5
+
+    ],
+
+    "R2": [
+
+        r2_score(
+            y_test,
+            linear_original_predictions
+        ),
+
+        r2_score(
+            y_test,
+            linear_modified_predictions
+        ),
+
+        r2_score(
+            y_test,
+            decision_tree_original_predictions
+        ),
+
+        r2_score(
+            y_test,
+            decision_tree_modified_predictions
+        )
+
+    ]
+
+})
+
+print("\nMODEL RESULTS TABLE")
+
+print(results)
+
+results.to_csv(
+    "model_results.csv",
+    index=False
+)
+
+print("\nMODEL RESULTS SAVED")
+print("model_results.csv")
+
 # Save cleaned dataset
 
 df.to_csv(
@@ -585,7 +813,9 @@ print("- correlation_heatmap.png")
 print("- predicted_vs_actual.png")
 print("- residual_plot.png")
 print("- feature_importance.png")
-
+print("- diesel_mean_median_mode.png")
+print("- shewhart_chart.png")
+print("- model_results.csv")
 # Main menu system
 
 def main():
